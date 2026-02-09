@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: satellite-frontend
+  namespace: satellite-system
+  labels:
+    app: satellite-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: satellite-frontend
+  template:
+    metadata:
+      labels:
+        app: satellite-frontend
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - name: static-files
+          mountPath: /usr/share/nginx/html
+        resources:
+          requests:
+            memory: "16Mi"
+            cpu: "10m"
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 3
+          periodSeconds: 10
+      volumes:
+      - name: static-files
+        configMap:
+          name: satellite-frontend-static

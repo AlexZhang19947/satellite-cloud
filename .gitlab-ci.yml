@@ -1,0 +1,126 @@
+stages:
+  - build
+  - test
+  - build-image
+  - deploy
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  BACKEND_IMAGE: $CI_REGISTRY_IMAGE/backend
+  FRONTEND_IMAGE: $CI_REGISTRY_IMAGE/frontend
+
+# 后端构建
+build-backend:
+  stage: build
+  image: golang:1.21-alpine
+  script:
+    - cd backend
+    - go mod download
+    - go build -o bin/server ./cmd/server
+  artifacts:
+    paths:
+      - backend/bin/
+    expire_in: 1 hour
+
+# 后端测试
+test-backend:
+  stage: test
+  image: golang:1.21-alpine
+  script:
+    - cd backend
+    - go mod download
+    - go test ./... -v
+  only:
+    - merge_requests
+    - main
+    - develop
+
+# 前端构建
+build-frontend:
+  stage: build
+  image: node:18-alpine
+  script:
+    - cd frontend
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/dist/
+    expire_in: 1 hour
+  only:
+    - main
+    - develop
+    - merge_requests
+
+# 构建后端 Docker 镜像
+build-backend-image:
+  stage: build-image
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - cd backend
+    - docker build -t $BACKEND_IMAGE:$CI_COMMIT_SHA .
+    - docker build -t $BACKEND_IMAGE:latest .
+    - docker push $BACKEND_IMAGE:$CI_COMMIT_SHA
+    - docker push $BACKEND_IMAGE:latest
+  only:
+    - main
+    - develop
+
+# 构建前端 Docker 镜像
+build-frontend-image:
+  stage: build-image
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - cd frontend
+    - docker build -t $FRONTEND_IMAGE:$CI_COMMIT_SHA .
+    - docker build -t $FRONTEND_IMAGE:latest .
+    - docker push $FRONTEND_IMAGE:$CI_COMMIT_SHA
+    - docker push $FRONTEND_IMAGE:latest
+  only:
+    - main
+    - develop
+  dependencies:
+    - build-frontend
+
+# 部署到 Kubernetes (开发环境)
+deploy-dev:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  script:
+    - kubectl config use-context $K8S_DEV_CONTEXT
+    - kubectl set image deployment/satellite-api api=$BACKEND_IMAGE:$CI_COMMIT_SHA -n satellite-system
+    - kubectl rollout status deployment/satellite-api -n satellite-system
+    - kubectl set image deployment/satellite-frontend frontend=$FRONTEND_IMAGE:$CI_COMMIT_SHA -n satellite-system
+    - kubectl rollout status deployment/satellite-frontend -n satellite-system
+  environment:
+    name: development
+    url: https://satellite-dev.example.com
+  only:
+    - develop
+  when: manual
+
+# 部署到 Kubernetes (生产环境)
+deploy-prod:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  script:
+    - kubectl config use-context $K8S_PROD_CONTEXT
+    - kubectl set image deployment/satellite-api api=$BACKEND_IMAGE:$CI_COMMIT_SHA -n satellite-system
+    - kubectl rollout status deployment/satellite-api -n satellite-system
+    - kubectl set image deployment/satellite-frontend frontend=$FRONTEND_IMAGE:$CI_COMMIT_SHA -n satellite-system
+    - kubectl rollout status deployment/satellite-frontend -n satellite-system
+  environment:
+    name: production
+    url: https://satellite.example.com
+  only:
+    - main
+  when: manual
