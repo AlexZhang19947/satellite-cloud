@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: satellite-postgres
+  namespace: satellite-system
+  labels:
+    app: satellite-postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: satellite-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+
