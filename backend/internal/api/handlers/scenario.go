@@ -25,8 +25,6 @@ func NewScenarioHandler(db *gorm.DB, logger *zap.Logger) *ScenarioHandler {
 
 // List 获取场景列表
 func (h *ScenarioHandler) List(c *gin.Context) {
-	var scenarios []model.Scenario
-	
 	// 查询场景列表（不包含卫星详情）
 	var results []model.ScenarioListResponse
 	err := h.db.Model(&model.Scenario{}).

@@ -42,7 +42,7 @@ func New(level, output string) *zap.Logger {
 }
 
 // Middleware 返回 Gin 日志中间件
-func (l *zap.Logger) Middleware() gin.HandlerFunc {
+func Middleware(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
@@ -51,7 +51,7 @@ func (l *zap.Logger) Middleware() gin.HandlerFunc {
 		c.Next()
 
 		latency := time.Since(start)
-		l.Info("HTTP Request",
+		logger.Info("HTTP Request",
 			zap.Int("status", c.Writer.Status()),
 			zap.String("method", c.Request.Method),
 			zap.String("path", path),

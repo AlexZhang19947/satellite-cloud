@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
@@ -24,12 +24,12 @@ func main() {
 	cfg := config.Load()
 
 	// 初始化日志
-	logger := logger.New(cfg.Log.Level, cfg.Log.Output)
+	zapLogger := logger.New(cfg.Log.Level, cfg.Log.Output)
 
 	// 初始化数据库
 	db, err := database.NewPostgres(cfg.Database)
 	if err != nil {
-		logger.Fatal("Failed to connect to database", zap.Error(err))
+		zapLogger.Fatal("Failed to connect to database", zap.Error(err))
 	}
 
 	// 设置 Gin 模式
@@ -42,7 +42,17 @@ func main() {
 	
 	// 中间件
 	router.Use(gin.Recovery())
-	router.Use(logger.Middleware())
+	router.Use(logger.Middleware(zapLogger))
+
+	// CORS 配置（开发环境：放开所有来源，方便前后端联调）
+	router.Use(cors.New(cors.Config{
+		AllowAllOrigins:  true,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	// 健康检查
 	router.GET("/health", func(c *gin.Context) {
@@ -50,7 +60,12 @@ func main() {
 	})
 
 	router.GET("/ready", func(c *gin.Context) {
-		if err := db.Ping(); err != nil {
+		sqlDB, err := db.DB()
+		if err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not ready"})
+			return
+		}
+		if err := sqlDB.Ping(); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not ready"})
 			return
 		}
@@ -60,7 +75,7 @@ func main() {
 	// API 路由
 	api := router.Group("/api")
 	{
-		handlers.RegisterRoutes(api, db, logger)
+		handlers.RegisterRoutes(api, db, zapLogger)
 	}
 
 	// 创建 HTTP 服务器
@@ -74,9 +89,9 @@ func main() {
 
 	// 启动服务器（goroutine）
 	go func() {
-		logger.Info("Starting server", zap.Int("port", cfg.Server.Port))
+		zapLogger.Info("Starting server", zap.Int("port", cfg.Server.Port))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Failed to start server", zap.Error(err))
+			zapLogger.Fatal("Failed to start server", zap.Error(err))
 		}
 	}()
 
@@ -85,14 +100,14 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("Shutting down server...")
+	zapLogger.Info("Shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		logger.Fatal("Server forced to shutdown", zap.Error(err))
+		zapLogger.Fatal("Server forced to shutdown", zap.Error(err))
 	}
 
-	logger.Info("Server exited")
+	zapLogger.Info("Server exited")
 }

@@ -68,8 +68,8 @@ const navItems = ref([
   },
   { 
     title: '卫星网络拓扑',
-    // 这是一个网络拓扑示意图
-    imgUrl: 'https://images.unsplash.com/photo-1558494949-ef526b01201b?q=80&w=400&auto=format&fit=crop', 
+    // 这是一个网络拓扑示意图（节点 + 连线）
+    imgUrl: 'https://images.pexels.com/photos/373543/pexels-photo-373543.jpeg?auto=compress&cs=tinysrgb&w=400', 
     route: '/simulation/topology'
   },
   { 

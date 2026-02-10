@@ -1,9 +1,10 @@
 package model
 
 import (
-	"time"
+    "time"
 
-	"gorm.io/gorm"
+    "gorm.io/datatypes"
+    "gorm.io/gorm"
 )
 
 // Scenario 场景模型
@@ -17,7 +18,7 @@ type Scenario struct {
 	IncDeg        float64        `json:"inc_deg"`
 	NPlanes       int            `json:"n_planes"`
 	NSatsPerPlane int            `json:"n_sats_per_plane"`
-	SensorConfig  map[string]interface{} `gorm:"type:jsonb" json:"sensor_config"`
+	SensorConfig  datatypes.JSONMap `gorm:"type:jsonb" json:"sensor_config"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
