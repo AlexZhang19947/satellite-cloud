@@ -32,6 +32,12 @@ const routes = [
     name: 'Topology3D',
     component: () => import('../components/SatTopology3D.vue') 
   },
+  {
+    // 性能监控中台（Prometheus 风格假数据面板）
+    path: '/monitor',
+    name: 'MonitorDashboard',
+    component: () => import('../view/MonitorDashboard.vue')
+  },
   // 404 路由：匹配所有未定义的路径，重定向回主页
   {
     path: '/:pathMatch(.*)*',
