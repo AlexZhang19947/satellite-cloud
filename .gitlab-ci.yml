@@ -1,126 +1,63 @@
 stages:
   - build
-  - test
-  - build-image
   - deploy
 
 variables:
+  HARBOR_URL: "192.168.10.238"
+  HARBOR_PROJECT: "satellite"
+  BACKEND_IMAGE: "$HARBOR_URL/$HARBOR_PROJECT/backend:$CI_COMMIT_SHORT_SHA"
+  FRONTEND_IMAGE: "$HARBOR_URL/$HARBOR_PROJECT/frontend:$CI_COMMIT_SHORT_SHA"
   DOCKER_DRIVER: overlay2
-  DOCKER_TLS_CERTDIR: "/certs"
-  BACKEND_IMAGE: $CI_REGISTRY_IMAGE/backend
-  FRONTEND_IMAGE: $CI_REGISTRY_IMAGE/frontend
 
-# 后端构建
+# 构建并推送后端镜像
 build-backend:
   stage: build
-  image: golang:1.21-alpine
+  image: docker:24.0
+  services:
+    - docker:24.0-dind
   script:
+    - echo "$HARBOR_PASSWORD" | docker login -u "$HARBOR_USER" --password-stdin "$HARBOR_URL"
     - cd backend
-    - go mod download
-    - go build -o bin/server ./cmd/server
-  artifacts:
-    paths:
-      - backend/bin/
-    expire_in: 1 hour
-
-# 后端测试
-test-backend:
-  stage: test
-  image: golang:1.21-alpine
-  script:
-    - cd backend
-    - go mod download
-    - go test ./... -v
+    - docker build -t "$BACKEND_IMAGE" .
+    - docker push "$BACKEND_IMAGE"
+  tags:
+    - k8s-cluster-runner
   only:
-    - merge_requests
     - main
-    - develop
 
-# 前端构建
+# 构建并推送前端镜像
 build-frontend:
   stage: build
-  image: node:18-alpine
-  script:
-    - cd frontend
-    - npm ci
-    - npm run build
-  artifacts:
-    paths:
-      - frontend/dist/
-    expire_in: 1 hour
-  only:
-    - main
-    - develop
-    - merge_requests
-
-# 构建后端 Docker 镜像
-build-backend-image:
-  stage: build-image
-  image: docker:latest
+  image: docker:24.0
   services:
-    - docker:dind
-  before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker:24.0-dind
   script:
-    - cd backend
-    - docker build -t $BACKEND_IMAGE:$CI_COMMIT_SHA .
-    - docker build -t $BACKEND_IMAGE:latest .
-    - docker push $BACKEND_IMAGE:$CI_COMMIT_SHA
-    - docker push $BACKEND_IMAGE:latest
-  only:
-    - main
-    - develop
-
-# 构建前端 Docker 镜像
-build-frontend-image:
-  stage: build-image
-  image: docker:latest
-  services:
-    - docker:dind
-  before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-  script:
+    - echo "$HARBOR_PASSWORD" | docker login -u "$HARBOR_USER" --password-stdin "$HARBOR_URL"
     - cd frontend
-    - docker build -t $FRONTEND_IMAGE:$CI_COMMIT_SHA .
-    - docker build -t $FRONTEND_IMAGE:latest .
-    - docker push $FRONTEND_IMAGE:$CI_COMMIT_SHA
-    - docker push $FRONTEND_IMAGE:latest
+    - docker build -t "$FRONTEND_IMAGE" .
+    - docker push "$FRONTEND_IMAGE"
+  tags:
+    - k8s-cluster-runner
   only:
     - main
-    - develop
-  dependencies:
+
+deploy:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  script:
+    - echo "部署到 namespace=gitlab-runner"
+    # 应用/更新后端 Deployment + Service
+    - kubectl -n gitlab-runner apply -f k8s/backend/deployment.yaml
+    - kubectl -n gitlab-runner set image deployment/satellite-backend satellite-backend="$BACKEND_IMAGE"
+    - kubectl -n gitlab-runner rollout status deployment/satellite-backend
+    # 应用/更新前端 Deployment + Service
+    - kubectl -n gitlab-runner apply -f k8s/frontend/deployment.yaml
+    - kubectl -n gitlab-runner set image deployment/satellite-frontend satellite-frontend="$FRONTEND_IMAGE"
+    - kubectl -n gitlab-runner rollout status deployment/satellite-frontend
+  tags:
+    - k8s-cluster-runner
+  needs:
+    - build-backend
     - build-frontend
-
-# 部署到 Kubernetes (开发环境)
-deploy-dev:
-  stage: deploy
-  image: bitnami/kubectl:latest
-  script:
-    - kubectl config use-context $K8S_DEV_CONTEXT
-    - kubectl set image deployment/satellite-api api=$BACKEND_IMAGE:$CI_COMMIT_SHA -n satellite-system
-    - kubectl rollout status deployment/satellite-api -n satellite-system
-    - kubectl set image deployment/satellite-frontend frontend=$FRONTEND_IMAGE:$CI_COMMIT_SHA -n satellite-system
-    - kubectl rollout status deployment/satellite-frontend -n satellite-system
-  environment:
-    name: development
-    url: https://satellite-dev.example.com
-  only:
-    - develop
-  when: manual
-
-# 部署到 Kubernetes (生产环境)
-deploy-prod:
-  stage: deploy
-  image: bitnami/kubectl:latest
-  script:
-    - kubectl config use-context $K8S_PROD_CONTEXT
-    - kubectl set image deployment/satellite-api api=$BACKEND_IMAGE:$CI_COMMIT_SHA -n satellite-system
-    - kubectl rollout status deployment/satellite-api -n satellite-system
-    - kubectl set image deployment/satellite-frontend frontend=$FRONTEND_IMAGE:$CI_COMMIT_SHA -n satellite-system
-    - kubectl rollout status deployment/satellite-frontend -n satellite-system
-  environment:
-    name: production
-    url: https://satellite.example.com
   only:
     - main
-  when: manual

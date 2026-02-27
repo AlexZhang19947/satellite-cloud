@@ -16,7 +16,7 @@ spec:
             prefix: "/api"
       route:
         - destination:
-            host: satellite-api.satellite-system.svc.cluster.local
+            host: satellite-backend.gitlab-runner.svc.cluster.local
             port:
               number: 8080
     # 前端路由：其余路径都走前端静态站点
@@ -25,7 +25,7 @@ spec:
             prefix: "/"
       route:
         - destination:
-            host: satellite-frontend.satellite-system.svc.cluster.local
+            host: satellite-frontend.gitlab-runner.svc.cluster.local
             port:
               number: 80
 

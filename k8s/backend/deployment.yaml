@@ -1,74 +1,89 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: satellite-api
-  namespace: satellite-system
+  name: satellite-backend
+  namespace: gitlab-runner
   labels:
-    app: satellite-api
+    app: satellite-backend
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
-      app: satellite-api
+      app: satellite-backend
   template:
     metadata:
       labels:
-        app: satellite-api
+        app: satellite-backend
     spec:
       containers:
-      - name: api
-        image: registry.gitlab.com/your-group/satellite-cloud/backend:latest
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 8080
-          name: http
-        env:
-        - name: SATELLITE_SERVER_PORT
-          value: "8080"
-        - name: SATELLITE_SERVER_MODE
-          value: "production"
-        - name: SATELLITE_DATABASE_HOST
-          valueFrom:
-            secretKeyRef:
-              name: satellite-db-secret
-              key: host
-        - name: SATELLITE_DATABASE_PORT
-          value: "5432"
-        - name: SATELLITE_DATABASE_USER
-          valueFrom:
-            secretKeyRef:
-              name: satellite-db-secret
-              key: user
-        - name: SATELLITE_DATABASE_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: satellite-db-secret
-              key: password
-        - name: SATELLITE_DATABASE_DBNAME
-          valueFrom:
-            secretKeyRef:
-              name: satellite-db-secret
-              key: dbname
-        - name: SATELLITE_LOG_LEVEL
-          value: "info"
-        resources:
-          requests:
-            memory: "32Mi"
-            cpu: "50m"
-          limits:
-            memory: "128Mi"
-            cpu: "200m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 10
-          periodSeconds: 30
-          timeoutSeconds: 3
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 10
-          timeoutSeconds: 3
+        - name: satellite-backend
+          image: 192.168.10.238/satellite/backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SATELLITE_SERVER_PORT
+              value: "8080"
+            - name: SATELLITE_SERVER_MODE
+              value: "production"
+            - name: SATELLITE_DATABASE_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: satellite-db-secret
+                  key: host
+            - name: SATELLITE_DATABASE_PORT
+              value: "5432"
+            - name: SATELLITE_DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: satellite-db-secret
+                  key: user
+            - name: SATELLITE_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: satellite-db-secret
+                  key: password
+            - name: SATELLITE_DATABASE_DBNAME
+              valueFrom:
+                secretKeyRef:
+                  name: satellite-db-secret
+                  key: dbname
+            - name: SATELLITE_LOG_LEVEL
+              value: "info"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: satellite-backend
+  namespace: gitlab-runner
+spec:
+  type: ClusterIP
+  selector:
+    app: satellite-backend
+  ports:
+    - port: 8080
+      targetPort: 8080
+
