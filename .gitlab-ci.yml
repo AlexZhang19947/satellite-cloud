@@ -12,9 +12,9 @@ variables:
 # 构建并推送后端镜像
 build-backend:
   stage: build
-  image: docker.m.daocloud.io/docker:latest
+  image: docker:25.0
   services:
-    - docker.m.daocloud.io/docker:latest-dind
+    - docker:25.0-dind
   variables:
     DOCKER_TLS_CERTDIR: ""
   script:
@@ -35,9 +35,9 @@ build-backend:
 # 构建并推送前端镜像
 build-frontend:
   stage: build
-  image: docker.m.daocloud.io/docker:latest
+  image: docker:25.0
   services:
-    - docker.m.daocloud.io/docker:latest-dind
+    - docker:25.0-dind
   variables:
     DOCKER_TLS_CERTDIR: ""
   script:
