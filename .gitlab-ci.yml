@@ -8,17 +8,15 @@ variables:
   BACKEND_IMAGE: "$HARBOR_URL/$HARBOR_PROJECT/backend:$CI_COMMIT_SHORT_SHA"
   FRONTEND_IMAGE: "$HARBOR_URL/$HARBOR_PROJECT/frontend:$CI_COMMIT_SHORT_SHA"
   DOCKER_DRIVER: overlay2
-  HARBOR_USER: "admin"
-  HARBOR_PASSWORD: "Harbor12345"
 
 # 构建并推送后端镜像
 build-backend:
   stage: build
-  image: docker:24.0
+  image: docker:27.0
   services:
-    - docker:24.0-dind
+    - docker:27.0-dind
   script:
-    - docker login -u "$HARBOR_USER" --password-stdin "$HARBOR_URL"
+    - echo "$HARBOR_PASSWORD" | docker login -u "$HARBOR_USER" --password-stdin "$HARBOR_URL"
     - cd backend
     - docker build -t "$BACKEND_IMAGE" .
     - docker push "$BACKEND_IMAGE"
@@ -30,9 +28,9 @@ build-backend:
 # 构建并推送前端镜像
 build-frontend:
   stage: build
-  image: docker:24.0
+  image: docker:27.0
   services:
-    - docker:24.0-dind
+    - docker:27.0-dind
   script:
     - echo "$HARBOR_PASSWORD" | docker login -u "$HARBOR_USER" --password-stdin "$HARBOR_URL"
     - cd frontend
