@@ -2,13 +2,13 @@ apiVersion: v1
 kind: Service
 metadata:
   name: satellite-api
-  namespace: satellite-system
+  namespace: gitlab-runner
   labels:
-    app: satellite-api
+    app: satellite-backend
 spec:
   type: ClusterIP
   selector:
-    app: satellite-api
+    app: satellite-backend
   ports:
   - port: 8080
     targetPort: 8080

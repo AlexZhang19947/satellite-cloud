@@ -2,7 +2,7 @@ apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
   name: satellite-virtualservice
-  namespace: satellite-system
+  namespace: istio-system
 spec:
   hosts:
     # 通过 192.168.*.*:30080 访问时，Host 通常为 IP 或空，这里用通配符适配所有情况
