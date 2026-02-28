@@ -12,7 +12,7 @@ const routes = [
     // 星座仿真系统
     path: '/simulation/Satelliteviewer',
     name: 'Satelliteviewer',
-    component: () => import('../components/Satelliteviewer.vue') 
+    component: () => import('../components/SatelliteViewer.vue') 
   },
   {
     // 卫星网络拓扑
