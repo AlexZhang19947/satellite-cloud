@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 
 	"github.com/spf13/viper"
 )
@@ -56,15 +58,7 @@ func Load() *Config {
 			Port: viper.GetInt("server.port"),
 			Mode: viper.GetString("server.mode"),
 		},
-		Database: DatabaseConfig{
-			Host:     viper.GetString("database.host"),
-			Port:     viper.GetInt("database.port"),
-			User:     viper.GetString("database.user"),
-			Password: viper.GetString("database.password"),
-			DBName:   viper.GetString("database.dbname"),
-			SSLMode:  viper.GetString("database.sslmode"),
-			MaxConns: viper.GetInt("database.max_conns"),
-		},
+		Database: dbConfigFromEnvOrViper(),
 		Log: LogConfig{
 			Level:  viper.GetString("log.level"),
 			Output: viper.GetString("log.output"),
@@ -72,6 +66,39 @@ func Load() *Config {
 	}
 
 	return config
+}
+
+// dbConfigFromEnvOrViper 优先使用 K8s 注入的 SATELLITE_DATABASE_* 环境变量
+func dbConfigFromEnvOrViper() DatabaseConfig {
+	get := func(envKey, viperKey string, defaultVal string) string {
+		if v := os.Getenv(envKey); v != "" {
+			return v
+		}
+		if v := viper.GetString(viperKey); v != "" {
+			return v
+		}
+		return defaultVal
+	}
+	getInt := func(envKey, viperKey string, defaultVal int) int {
+		if v := os.Getenv(envKey); v != "" {
+			if i, err := strconv.Atoi(v); err == nil {
+				return i
+			}
+		}
+		if v := viper.GetInt(viperKey); v != 0 || viper.IsSet(viperKey) {
+			return v
+		}
+		return defaultVal
+	}
+	return DatabaseConfig{
+		Host:     get("SATELLITE_DATABASE_HOST", "database.host", "localhost"),
+		Port:     getInt("SATELLITE_DATABASE_PORT", "database.port", 5432),
+		User:     get("SATELLITE_DATABASE_USER", "database.user", "satellite_user"),
+		Password: get("SATELLITE_DATABASE_PASSWORD", "database.password", "satellite_pass"),
+		DBName:   get("SATELLITE_DATABASE_DBNAME", "database.dbname", "satellite_db"),
+		SSLMode:  get("SATELLITE_DATABASE_SSLMODE", "database.sslmode", "disable"),
+		MaxConns: getInt("SATELLITE_DATABASE_MAXCONNS", "database.max_conns", 10),
+	}
 }
 
 func setDefaults() {
